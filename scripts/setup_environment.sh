@@ -22,10 +22,13 @@ source $BASEDIR/.venv/bin/activate
 echo "Installing project dependencies..."
 uv sync
 
-# Install 'ollama' if not already installed and on Linux
-if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    if ! command -v ollama &> /dev/null; then
-        echo "Installing 'ollama'..."
-        curl -LsSf https://ollama.sh/install.sh | sh
+# Install 'ollama' if not already installed
+if ! command -v ollama &> /dev/null; then
+    echo "Installing 'ollama'..."
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        curl -fsSL https://ollama.com/install.sh | sh
+    fi
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        brew install ollama
     fi
 fi
