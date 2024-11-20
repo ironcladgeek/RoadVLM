@@ -1,0 +1,14 @@
+[project]
+name = "roadvlm"
+version = "0.1.0"
+description = "RoadVLM leverages vision-language models to interpret driving scenes and predict human-like actions"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "matplotlib==3.9.2",
+    "ollama==0.3.3",
+    "opencv-python==4.10.0.84",
+    "pillow==11.0.0",
+    "pydantic==2.10.0",
+    "pyyaml==6.0.2",
+]
