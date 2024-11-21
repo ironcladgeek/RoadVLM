@@ -68,11 +68,10 @@ class DetectedObject(BaseModel):
     )
 
 
-class Direction(BaseModel):
-    """Represents the predicted direction of movement."""
+class Prediction(BaseModel):
+    """Main prediction output for a driving action."""
 
-    angle: float = Field(..., description="Angle in degrees (0-360)")
-    type: ActionType
+    action: ActionType
     confidence: float = Field(..., ge=0.0, le=1.0)
 
 
@@ -86,19 +85,11 @@ class SceneContext(BaseModel):
     )
 
 
-class Prediction(BaseModel):
-    """Main prediction output for a driving action."""
-
-    action: ActionType
-    confidence: float = Field(..., ge=0.0, le=1.0)
-
-
 class RoadVLMOutput(BaseModel):
     """Complete output of the RoadVLM system."""
 
     prediction: Prediction
     objects: List[DetectedObject] = Field(default_factory=list)
-    direction: Direction
     scene_context: SceneContext
     image_id: Optional[str] = Field(
         None, description="Identifier for the processed image"
@@ -111,7 +102,7 @@ class RoadVLMOutput(BaseModel):
         json_schema_extra = {
             "example": {
                 "prediction": {
-                    "action": "TURN_RIGHT",
+                    "action": "CONTINUE",
                     "confidence": 0.89,
                 },
                 "objects": [
@@ -126,7 +117,6 @@ class RoadVLMOutput(BaseModel):
                         "confidence": 0.95,
                     }
                 ],
-                "direction": {"angle": 90, "type": "TURN_RIGHT", "confidence": 0.89},
                 "scene_context": {
                     "weather": "clear",
                     "time_of_day": "day",
