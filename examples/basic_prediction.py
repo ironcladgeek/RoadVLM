@@ -12,7 +12,7 @@ async def main():
     model = Model(model_name="llama3.2-vision")
 
     # Example image path - you can change this to your image path
-    image_path = Path("examples/sample_data/image.jpg")
+    image_path = Path("examples/sample_data/image1.png")
 
     try:
         # Step 1: Validate the image
@@ -37,10 +37,6 @@ async def main():
         print(f"Weather: {result.scene_context.weather.value}")
         print(f"Time of Day: {result.scene_context.time_of_day}")
         print(f"Road Type: {result.scene_context.road_type}")
-        print("\nDirection:")
-        print(f"Angle: {result.direction.angle}°")
-        print(f"Action: {result.direction.type.value}")
-        print(f"Confidence: {result.direction.confidence:.2f}")
         print("-" * 50)
         print(f"\nTotal processing time: {processing_time:.2f} seconds")
 
