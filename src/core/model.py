@@ -34,8 +34,6 @@ class Model:
     def __init__(
         self,
         model_name: str = "llama3.2-vision",
-        temperature: float = 0.1,
-        timeout: float = 30.0,
     ):
         """Initialize the model.
 
@@ -45,8 +43,6 @@ class Model:
             timeout: Maximum time (seconds) to wait for model response.
         """
         self.model_name = model_name
-        self.temperature = temperature
-        self.timeout = timeout
 
         self._prompts = get_prompts()
 
@@ -61,6 +57,8 @@ class Model:
     def _parse_action_response(self, response: Dict) -> Prediction:
         """Parse action prediction from model response."""
         content = response["message"]["content"]
+        print("\nAction response:")
+        print(content)
 
         # Extract action and confidence using regex
         action_match = re.search(r"Action:\s*(\w+)", content)
@@ -80,6 +78,8 @@ class Model:
     def _parse_scene_context(self, response: Dict) -> SceneContext:
         """Parse scene context from model response."""
         content = response["message"]["content"]
+        print("\nScene response:")
+        print(content)
 
         # Extract weather, time, and road type using regex
         weather_match = re.search(r"Weather:\s*(\w+)", content)
@@ -98,6 +98,8 @@ class Model:
     def _parse_direction(self, response: Dict) -> Direction:
         """Parse direction prediction from model response."""
         content = response["message"]["content"]
+        print("\nDirection response:")
+        print(content)
 
         # Extract angle, action type, and confidence using regex
         angle_match = re.search(r"Angle:\s*(\d+)", content)
