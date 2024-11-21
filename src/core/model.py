@@ -1,3 +1,4 @@
+# src/core/model.py
 import re
 from pathlib import Path
 from typing import Dict, Optional, Union
@@ -7,13 +8,17 @@ from pydantic import ValidationError
 
 from src.utils.data_types import (
     ActionType,
-    Direction,
     Prediction,
     RoadVLMOutput,
     SceneContext,
     WeatherCondition,
 )
-from src.utils.prompts import get_prompts
+from src.utils.prompts import (
+    get_action_values,
+    get_prompts,
+    get_time_values,
+    get_weather_values,
+)
 
 
 class ModelError(Exception):
@@ -35,15 +40,8 @@ class Model:
         self,
         model_name: str = "llama3.2-vision",
     ):
-        """Initialize the model.
-
-        Args:
-            model_name: Name of the Ollama model to use.
-            temperature: Sampling temperature for model outputs (0.0 to 1.0).
-            timeout: Maximum time (seconds) to wait for model response.
-        """
+        """Initialize the model."""
         self.model_name = model_name
-
         self._prompts = get_prompts()
 
     def _create_message(self, image_path: Union[str, Path], prompt: str) -> Dict:
@@ -54,104 +52,101 @@ class Model:
             "images": [str(image_path)],
         }
 
-    def _parse_action_response(self, response: Dict) -> Prediction:
-        """Parse action prediction from model response."""
-        content = response["message"]["content"]
-        print("\nAction response:")
+    def _parse_response(self, response: Dict) -> tuple[Prediction, SceneContext]:
+        """Parse the complete model response."""
+        content = response["message"]["content"].strip()
+        print("\nModel response:")
         print(content)
 
-        # Extract action and confidence using regex
-        action_match = re.search(r"Action:\s*(\w+)", content)
-        confidence_match = re.search(r"Confidence:\s*(0?\.\d+|1\.0|1)", content)
+        try:
+            # Split content into lines and remove empty lines
+            lines = [line.strip() for line in content.split("\n") if line.strip()]
 
-        if not action_match or not confidence_match:
-            raise ResponseParsingError(f"Failed to parse action response: {content}")
+            if len(lines) != 4:
+                raise ResponseParsingError(
+                    f"Expected 4 lines of output, got {len(lines)}. Response:\n{content}"
+                )
 
-        action = action_match.group(1)
-        confidence = float(confidence_match.group(1))
+            # Parse action line
+            action_match = re.match(
+                r"^Action:\s*(\w+),\s*Confidence:\s*(0?\.\d+|1\.0|1)$", lines[0]
+            )
+            if not action_match:
+                raise ResponseParsingError(
+                    f"Invalid action format. Got: '{lines[0]}'\n"
+                    f"Allowed actions are: {get_action_values()}"
+                )
 
-        return Prediction(
-            action=ActionType(action),
-            confidence=confidence,
-        )
+            # Parse weather line
+            weather_match = re.match(r"^Weather:\s*(\w+)$", lines[1])
+            if not weather_match:
+                raise ResponseParsingError(
+                    f"Invalid weather format. Got: '{lines[1]}'\n"
+                    f"Allowed weather values are: {get_weather_values()}"
+                )
 
-    def _parse_scene_context(self, response: Dict) -> SceneContext:
-        """Parse scene context from model response."""
-        content = response["message"]["content"]
-        print("\nScene response:")
-        print(content)
+            # Parse time line
+            time_match = re.match(r"^Time:\s*(\w+)$", lines[2])
+            if not time_match:
+                raise ResponseParsingError(
+                    f"Invalid time format. Got: '{lines[2]}'\n"
+                    f"Allowed time values are: {get_time_values()}"
+                )
 
-        # Extract weather, time, and road type using regex
-        weather_match = re.search(r"Weather:\s*(\w+)", content)
-        time_match = re.search(r"Time:\s*(\w+)", content)
-        road_match = re.search(r"Road:\s*(.+?)(?=\s*$|\s*[A-Z])", content)
+            # Parse road line
+            road_match = re.match(r"^Road:\s*(.+?)$", lines[3])
+            if not road_match:
+                raise ResponseParsingError(f"Invalid road format. Got: '{lines[3]}'")
 
-        if not all([weather_match, time_match, road_match]):
-            raise ResponseParsingError(f"Failed to parse scene context: {content}")
+            # Validate enum values
+            try:
+                action = ActionType(action_match.group(1))
+                weather = WeatherCondition(weather_match.group(1).lower())
+                time = time_match.group(1).lower()
+                if time not in ["day", "night", "dawn", "dusk"]:
+                    raise ValueError(f"Invalid time value: {time}")
+            except ValueError as e:
+                raise ResponseParsingError(f"Invalid enum value: {str(e)}") from e
 
-        return SceneContext(
-            weather=WeatherCondition(weather_match.group(1).lower()),
-            time_of_day=time_match.group(1).lower(),
-            road_type=road_match.group(1).strip(),
-        )
+            # Create objects
+            prediction = Prediction(
+                action=action,
+                confidence=float(action_match.group(2)),
+            )
 
-    def _parse_direction(self, response: Dict) -> Direction:
-        """Parse direction prediction from model response."""
-        content = response["message"]["content"]
-        print("\nDirection response:")
-        print(content)
+            scene_context = SceneContext(
+                weather=weather,
+                time_of_day=time,
+                road_type=road_match.group(1).strip(),
+            )
 
-        # Extract angle, action type, and confidence using regex
-        angle_match = re.search(r"Angle:\s*(\d+)", content)
-        action_match = re.search(r"Action:\s*(\w+)", content)
-        confidence_match = re.search(r"Confidence:\s*(0?\.\d+|1\.0|1)", content)
+            return prediction, scene_context
 
-        if not all([angle_match, action_match, confidence_match]):
-            raise ResponseParsingError(f"Failed to parse direction: {content}")
-
-        return Direction(
-            angle=float(angle_match.group(1)),
-            type=ActionType(action_match.group(1)),
-            confidence=float(confidence_match.group(1)),
-        )
+        except (AttributeError, IndexError) as e:
+            raise ResponseParsingError(
+                f"Failed to parse response components: {str(e)}\nResponse:\n{content}"
+            ) from e
 
     async def predict(
         self, image_path: Union[str, Path], image_id: Optional[str] = None
     ) -> RoadVLMOutput:
         """Generate predictions for a driving scene image."""
         try:
-            # Get driving action prediction
-            action_response = ollama.chat(
+            # Get complete scene analysis in one call
+            response = ollama.chat(
                 model=self.model_name,
                 messages=[
-                    self._create_message(image_path, self._prompts["driving_action"])
+                    self._create_message(image_path, self._prompts["scene_analysis"])
                 ],
             )
-            prediction = self._parse_action_response(action_response)
 
-            # Get scene context
-            context_response = ollama.chat(
-                model=self.model_name,
-                messages=[
-                    self._create_message(image_path, self._prompts["scene_context"])
-                ],
-            )
-            scene_context = self._parse_scene_context(context_response)
-
-            # Get direction prediction
-            direction_response = ollama.chat(
-                model=self.model_name,
-                messages=[self._create_message(image_path, self._prompts["direction"])],
-            )
-            direction = self._parse_direction(direction_response)
+            prediction, scene_context = self._parse_response(response)
 
             # Combine all predictions
             output = RoadVLMOutput(
                 prediction=prediction,
-                direction=direction,
                 scene_context=scene_context,
                 image_id=image_id,
-                objects=[],  # Empty for now, will be handled by scene analyzer
             )
 
             return output
