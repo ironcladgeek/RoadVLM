@@ -1,10 +1,8 @@
-# src/core/model.py
-import re
+import json
 from pathlib import Path
 from typing import Dict, Optional, Union
 
 import ollama
-import json
 from pydantic import ValidationError
 
 from src.utils.data_types import (
@@ -14,12 +12,7 @@ from src.utils.data_types import (
     SceneContext,
     WeatherCondition,
 )
-from src.utils.prompts import (
-    get_action_values,
-    get_prompts,
-    get_time_values,
-    get_weather_values,
-)
+from src.utils.prompts import get_prompts
 
 
 class ModelError(Exception):
@@ -92,7 +85,6 @@ class Model:
                 f"Failed to parse response components: {str(e)}\nResponse:\n{content}"
             ) from e
 
-
     async def predict(
         self, image_path: Union[str, Path], image_id: Optional[str] = None
     ) -> RoadVLMOutput:
@@ -103,7 +95,8 @@ class Model:
                 model=self.model_name,
                 messages=[
                     self._create_message(image_path, self._prompts["scene_analysis"])
-                ],format="json",
+                ],
+                format="json",
             )
             prediction, scene_context = self._parse_response(response)
 
