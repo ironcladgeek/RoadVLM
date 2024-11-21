@@ -12,7 +12,7 @@ async def main():
     model = Model(model_name="llama3.2-vision")
 
     # Example image path - you can change this to your image path
-    image_path = Path("examples/sample_data/image1.png")
+    image_path = Path("examples/sample_data/collision.png")
 
     try:
         # Step 1: Validate the image

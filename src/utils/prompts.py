@@ -27,10 +27,13 @@ def get_prompts() -> Dict[str, str]:
             f"Allowed ACTION values: {get_action_values()}\n"
             f"Allowed WEATHER values: {get_weather_values()}\n"
             f"Allowed TIME values: {get_time_values()}\n\n"
-            "Required format:\n"
-            "Action: [EXACT ACTION VALUE], Confidence: [NUMBER 0-1]\n"
-            "Weather: [EXACT WEATHER VALUE]\n"
-            "Time: [EXACT TIME VALUE]\n"
-            "Road: [BRIEF DESCRIPTION]"
+            "Required format (in JSON):\n"
+            "{\n"
+            "  \"Action\": \"[EXACT ACTION VALUE]\",\n"
+            "  \"Confidence\": [NUMBER 0-1],\n"
+            "  \"Weather\": \"[EXACT WEATHER VALUE]\",\n"
+            "  \"Time\": \"[EXACT TIME VALUE]\",\n"
+            "  \"Road\": \"[BRIEF DESCRIPTION]\"\n"
+            "}"
         )
     }

@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Dict, Optional, Union
 
 import ollama
+import json
 from pydantic import ValidationError
 
 from src.utils.data_types import (
@@ -59,50 +60,14 @@ class Model:
         print(content)
 
         try:
-            # Split content into lines and remove empty lines
-            lines = [line.strip() for line in content.split("\n") if line.strip()]
-
-            if len(lines) != 4:
-                raise ResponseParsingError(
-                    f"Expected 4 lines of output, got {len(lines)}. Response:\n{content}"
-                )
-
-            # Parse action line
-            action_match = re.match(
-                r"^Action:\s*(\w+),\s*Confidence:\s*(0?\.\d+|1\.0|1)$", lines[0]
-            )
-            if not action_match:
-                raise ResponseParsingError(
-                    f"Invalid action format. Got: '{lines[0]}'\n"
-                    f"Allowed actions are: {get_action_values()}"
-                )
-
-            # Parse weather line
-            weather_match = re.match(r"^Weather:\s*(\w+)$", lines[1])
-            if not weather_match:
-                raise ResponseParsingError(
-                    f"Invalid weather format. Got: '{lines[1]}'\n"
-                    f"Allowed weather values are: {get_weather_values()}"
-                )
-
-            # Parse time line
-            time_match = re.match(r"^Time:\s*(\w+)$", lines[2])
-            if not time_match:
-                raise ResponseParsingError(
-                    f"Invalid time format. Got: '{lines[2]}'\n"
-                    f"Allowed time values are: {get_time_values()}"
-                )
-
-            # Parse road line
-            road_match = re.match(r"^Road:\s*(.+?)$", lines[3])
-            if not road_match:
-                raise ResponseParsingError(f"Invalid road format. Got: '{lines[3]}'")
+            # Parse JSON content
+            data = json.loads(content)
 
             # Validate enum values
             try:
-                action = ActionType(action_match.group(1))
-                weather = WeatherCondition(weather_match.group(1).lower())
-                time = time_match.group(1).lower()
+                action = ActionType(data["Action"])
+                weather = WeatherCondition(data["Weather"].lower())
+                time = data["Time"].lower()
                 if time not in ["day", "night", "dawn", "dusk"]:
                     raise ValueError(f"Invalid time value: {time}")
             except ValueError as e:
@@ -111,21 +76,22 @@ class Model:
             # Create objects
             prediction = Prediction(
                 action=action,
-                confidence=float(action_match.group(2)),
+                confidence=float(data["Confidence"]),
             )
 
             scene_context = SceneContext(
                 weather=weather,
                 time_of_day=time,
-                road_type=road_match.group(1).strip(),
+                road_type=data["Road"].strip(),
             )
 
             return prediction, scene_context
 
-        except (AttributeError, IndexError) as e:
+        except (json.JSONDecodeError, KeyError, TypeError) as e:
             raise ResponseParsingError(
                 f"Failed to parse response components: {str(e)}\nResponse:\n{content}"
             ) from e
+
 
     async def predict(
         self, image_path: Union[str, Path], image_id: Optional[str] = None
@@ -137,9 +103,8 @@ class Model:
                 model=self.model_name,
                 messages=[
                     self._create_message(image_path, self._prompts["scene_analysis"])
-                ],
+                ],format="json",
             )
-
             prediction, scene_context = self._parse_response(response)
 
             # Combine all predictions
