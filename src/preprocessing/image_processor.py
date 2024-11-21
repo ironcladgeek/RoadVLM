@@ -1,3 +1,5 @@
+# src/preprocessing/image_processor.py
+
 from pathlib import Path
 from typing import Union
 
